@@ -84,8 +84,12 @@ class CustomerAccount:
             checksum = 0
         else:
             checksum = 10 - (int(card_sum) % 10)
+
         if int(card) == int(f"{card[:-1]}{checksum}"):
-            if self.cur.execute(f"SELECT COUNT(1) FROM card WHERE number = {card}") == 1:
+            q = self.cur.execute(f"SELECT COUNT(1) FROM card WHERE number = {card};")
+            result = sum(q.fetchone())
+            print(result)
+            if result == 1:
                 return "card_check_ok"
             else:
                 return "Such a card does not exist."
@@ -152,20 +156,15 @@ class Interface:
 
         elif page == 2:
             print("Enter your card number:")
-            input_card = input(">")
+            input_card: str = input(">")
             print("Enter your PIN:")
-            input_pin = input(">")
-            test_card = CustomerAccount.check_card(self, input_card)
-            #if test_card == "check_card_ok":
-            #    CustomerAccount.login(self, input_card, input_pin)
-            #else:
-            #    print(test_card)
-            for account in CustomerAccount.all_accounts:
-                if account.login(input_card, input_pin):
-                    print("You have successfully logged in!")
-                    self.logged_user = input_card
-                else:
-                    print("Wrong card number or PIN!")
+            input_pin: str = input(">")
+            test_card = CustomerAccount().check_card(input_card)
+            if test_card == "card_check_ok":
+                CustomerAccount().login(input_card, input_pin)
+            else:
+                print(test_card)
+
         elif page == 3:
             current_balance = 0
             print(f"Balance:{current_balance}");
@@ -175,7 +174,7 @@ class Interface:
         elif page == 6:
             print("Enter income:")
             income = int(input(">"))
-            logged_user =  self.logged_user
+            logged_user = self.logged_user
             result = self.system.add_income(logged_user, income)
             print(result)  # add income
 
