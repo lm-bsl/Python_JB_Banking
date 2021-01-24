@@ -59,16 +59,20 @@ class CustomerAccount:
         self.conn.commit()
         return "Income was added!"
 
-    def transfer(self, amount, card):
-        card_number = self.card_number
-        var_check = self.check_card(card)
-        if var_check == "card_check_ok":
-            self.cur.execute(f"UPDATE card SET balance = balance - {amount} WHERE number  = {card_number} ;")
-            # add
-            self.cur.execute(f"UPDATE card SET balance = balance + {amount} WHERE number  = {card} ;")
-            self.conn.commit()
+    def transfer(self, from_account, to_account, amount):
+        var_check = CustomerAccount().check_card(to_account)
+        var_creation = CustomerAccount().check_card_creation(to_account)
+        if var_check & var_creation:
+            if int(CustomerAccount().balance(from_account)) >= int(amount):
+                self.cur.execute(f"UPDATE card SET balance = balance - {amount} WHERE number  = {from_account} ;")
+                # add
+                self.cur.execute(f"UPDATE card SET balance = balance + {amount} WHERE number  = {to_account} ;")
+                self.conn.commit()
+                print("Success!")
+            else:
+                print("Not enough Money")
         else:
-            print(var_check)
+            print("Probably you made a mistake in the card number. Please try again!")
 
     def check_card(self, card):
         count = 0
@@ -86,21 +90,34 @@ class CustomerAccount:
             checksum = 10 - (int(card_sum) % 10)
 
         if int(card) == int(f"{card[:-1]}{checksum}"):
-            q = self.cur.execute(f"SELECT COUNT(1) FROM card WHERE number = {card};")
-            result = sum(q.fetchone())
-            print(result)
-            if result == 1:
-                return "card_check_ok"
-            else:
-                return "Such a card does not exist."
-        else:
-            return "Probably you made a mistake in the card number. Please try again!"
-
-    def login(self, card, pin):
-        if self.pin == int(pin) and self.card_number == int(card):
             return True
         else:
             return False
+
+    def check_card_creation(self, card):
+        q = self.cur.execute(f"SELECT COUNT(1) FROM card WHERE number = {card};")
+        result = sum(q.fetchone())
+        if result == 1:
+            return True
+        else:
+            return False
+
+    def login(self, card, pin):
+        q = self.cur.execute(f"SELECT COUNT(1) FROM card WHERE number = {card} AND pin = {pin};")
+        result = sum(q.fetchone())
+        print(result)
+        if result == 1:
+            return True
+        else:
+            return False
+
+    def balance(self, card):
+        q = self.cur.execute(f"SELECT balance FROM card WHERE number = {card};")
+        return sum(q.fetchone())
+
+    def delete_account(self, card):
+        self.cur.execute(f"DELETE FROM card WHERE number = {card};")
+        self.conn.commit()
 
 
 class Interface:
@@ -159,38 +176,43 @@ class Interface:
             input_card: str = input(">")
             print("Enter your PIN:")
             input_pin: str = input(">")
-            test_card = CustomerAccount().check_card(input_card)
-            if test_card == "card_check_ok":
-                CustomerAccount().login(input_card, input_pin)
+            check_login = CustomerAccount().login(input_card, input_pin)
+            if check_login:
+                self.logged_user = input_card
+                print("You have successfully logged in!")
             else:
-                print(test_card)
+                print("Wrong card number or PIN!")
 
         elif page == 3:
-            current_balance = 0
-            print(f"Balance:{current_balance}");
+            balance = CustomerAccount().balance(self.logged_user)
+            print(f"Balance:{balance}")
+
         elif page == 4:
             self.logged_user = None
             print("You have successfully logged out!")
         elif page == 6:
             print("Enter income:")
-            income = int(input(">"))
+            income: int = input(">")
             logged_user = self.logged_user
-            result = self.system.add_income(logged_user, income)
+            result = CustomerAccount().add_income(logged_user, income)
             print(result)  # add income
 
         elif page == 7:
             print("Transfer")
             print("Enter card number")
-            card = int(input(">"))
-
-            check_result = self.check_card(card)
-            if check_result == "card_check_ok":
-                money_to_transfer = input("Enter how much money you want to transfer:")
-                self.transfer(money_to_transfer, card)
+            card: str = input(">")
+            if self.system.check_card(card):
+                if self.system.check_card_creation(card):
+                    print("Enter how much money you want to transfer:")
+                    money_to_transfer: int = int(input(">"))
+                    CustomerAccount().transfer(self.logged_user, card, money_to_transfer)
+                else:
+                    print("Such card do not exist")
             else:
-                print(check_result)
+                print("Probably you made a mistake in the card number. Please try again!")
         elif page == 8:
-            return None
+            self.system.delete_account(self.logged_user)
+            print("The account has been closed!")
         elif page == 5:
             print("Bye!")
             quit()
